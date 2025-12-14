@@ -1,0 +1,19 @@
+{
+  "name": "purple-filmly",
+  "version": "0.0.0",
+  "scripts": {
+    "start:api": "node server/index.js"
+  },
+  "private": true,
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "swagger-ui-express": "^5.0.1",
+    "yamljs": "^0.3.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.7.2",
+    "typescript-eslint": "8.27.0"
+  }
+}

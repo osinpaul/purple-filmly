@@ -1,0 +1,368 @@
+openapi: 3.0.3
+info:
+  title: Filmlly API
+  version: 1.0.1
+  description: |
+    API для авторизации, получения жанров, поиска фильмов и управления избранным.
+
+servers:
+  - url: https://api.example.com
+    description: Production
+  - url: http://localhost:3000
+    description: Local
+
+tags:
+  - name: Auth
+  - name: Genres
+  - name: Movies
+  - name: Favorites
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Invalid request
+        details:
+          type: object
+          additionalProperties: true
+      required: [code, message]
+
+    AuthRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          minLength: 1
+          example: "P@ssw0rd!"
+      required: [email, password]
+
+    AuthResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        accessToken:
+          type: string
+          description: JWT access token
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        tokenType:
+          type: string
+          example: Bearer
+        expiresIn:
+          type: integer
+          description: Время жизни токена в секундах
+          example: 3600
+      required: [accessToken, tokenType, expiresIn]
+
+    Genre:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          example: 2
+        name:
+          type: string
+          example: Фантастика
+        slug:
+          type: string
+          example: fantasy
+      required: [id, name, slug]
+
+    Movie:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          example: m_002
+        title:
+          type: string
+          example: Interstellar
+        releaseYear:
+          type: integer
+          example: 2014
+        genreIds:
+          type: array
+          items:
+            type: integer
+          example: [2, 4]
+        rating:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 5
+          example: 4.8
+        posterUrl:
+          type: string
+          format: uri
+          example: https://upload.wikimedia.org/wikipedia/en/b/bc/Interstellar_film_poster.jpg
+        isFavorite:
+          type: boolean
+          description: Признак того, что фильм находится в избранном у текущего пользователя
+          example: true
+        description:
+          type: string
+          example: Экспедиция за пределы привычного мира ради будущего человечества.
+        durationMin:
+          type: integer
+          example: 169
+      required:
+        [id, title, releaseYear, genreIds, rating, posterUrl, isFavorite]
+
+    MoviesResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Movie"
+        total:
+          type: integer
+          example: 42
+      required: [items, total]
+
+    FavoritesResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Movie"
+      required: [items]
+
+paths:
+  /auth:
+    post:
+      tags: [Auth]
+      summary: Авторизация по email и паролю
+      operationId: authLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthRequest"
+      responses:
+        "200":
+          description: Успешная авторизация
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Ошибка валидации
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Неверный email или пароль
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /logout:
+    post:
+      tags: [Auth]
+      summary: Выход из аккаунта
+      operationId: authLogout
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Успешный выход
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Successfully logged out
+                required: [message]
+        "401":
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /genres:
+    get:
+      tags: [Genres]
+      summary: Получить список жанров
+      operationId: getGenres
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Список жанров
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Genre"
+        "401":
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /movies:
+    get:
+      tags: [Movies]
+      summary: Поиск фильмов по параметрам
+      operationId: searchMovies
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: query
+          description: |
+            Список id жанров. Формат в URL: `?id=1&id=2` (эквивалент `id[]`).
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: integer
+          example: [2, 4]
+
+        - name: from
+          in: query
+          description: Год выхода от (включительно)
+          required: false
+          schema:
+            type: integer
+          example: 2010
+
+        - name: to
+          in: query
+          description: Год выхода до (включительно)
+          required: false
+          schema:
+            type: integer
+          example: 2015
+
+        - name: sort
+          in: query
+          description: Поле сортировки
+          required: false
+          schema:
+            type: string
+            enum: [rating, name, genre]
+          example: rating
+
+      responses:
+        "200":
+          description: Найденные фильмы (каждый фильм содержит isFavorite)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MoviesResponse"
+        "400":
+          description: Ошибка валидации параметров
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /favorites:
+    get:
+      tags: [Favorites]
+      summary: Получить список избранного с фильтрацией
+      operationId: getFavorites
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: query
+          description: |
+            Список id жанров. Формат в URL: `?id=1&id=2` (эквивалент `id[]`).
+          required: false
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: integer
+          example: [2, 4]
+
+        - name: from
+          in: query
+          description: Год выхода от (включительно)
+          required: false
+          schema:
+            type: integer
+          example: 2010
+
+        - name: to
+          in: query
+          description: Год выхода до (включительно)
+          required: false
+          schema:
+            type: integer
+          example: 2015
+
+        - name: sort
+          in: query
+          description: Поле сортировки
+          required: false
+          schema:
+            type: string
+            enum: [rating, name, genre]
+          example: rating
+
+      responses:
+        "200":
+          description: Список избранного (Movie с isFavorite=true)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FavoritesResponse"
+        "400":
+          description: Ошибка валидации параметров
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+security:
+  - BearerAuth: []
